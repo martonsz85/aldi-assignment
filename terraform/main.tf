@@ -1,21 +1,26 @@
-resource "kubernetes_namespace" "homework" {
+resource "kubernetes_namespace_v1" "homework" {
     metadata {
-        name = "production"
+        name = var.namespace
     }
 }
 
-resource "helm_release" "homework" {
-    name       = "homework"
-    chart      = "../helm/homework"
-    namespace  = kubernetes_namespace.homework.metadata[0].name
+resource "helm_release" "myapp" {
+    name       = "myapp"
+    repository = var.chart_repo
+    chart      = "myapp"
+    version    = var.chart_version
+    namespace  = kubernetes_namespace_v1.homework.metadata[0].name
 
-    set {
+    set = [{
         name  = "image.tag"
-        value = 
-    }
-
-    set {
+        value = var.image_tag
+    },
+    {
+        name  = "image.repository"
+        value = var.image_repo
+    },
+    {
         name  = "environment"
-        value = prod
-    }
+        value = var.environment
+    }]
 }
