@@ -1,13 +1,86 @@
 stages:
   - build
+  - push
   - deploy
 
-build:
-  stage: build
-  script:
-    - echo "Building the application..."
+variables:
+  DOCKER_IMAGE: "$CI_REGISTRY_IMAGE/myapp"
+  CHART_VERSION: "$CI_PIPELINE_ID"
+  IMAGE_TAG: "$CI_PIPELINE_ID"
 
-deploy:
-  stage: deploy
+# -----------------------
+# CI: build & push image
+# -----------------------
+
+build_image:
+  stage: build
+  image: docker:29
+  services:
+    - docker:29-dind
   script:
-    - echo "Deploying the application..."
+    - docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    - docker build -t "$DOCKER_IMAGE:$IMAGE_TAG" .
+  artifacts:
+    reports:
+      dotenv: build.env
+  after_script:
+    - echo "IMAGE_TAG=$IMAGE_TAG" >> build.env
+    - echo "CHART_VERSION=$CHART_VERSION" >> build.env
+
+package_chart:
+  stage: build
+  image: alpine/helm:3.21
+  script:
+    - helm package ./helm --version "$CI_PIPELINE_ID"
+    - mv myapp-"$CI_PIPELINE_ID".tgz chart.tgz
+  artifacts:
+    paths:
+      - chart.tgz
+    reports:
+      dotenv: chart.env
+  after_script:
+    - echo "CHART_VERSION=$CI_PIPELINE_ID" >> chart.env
+
+push_image:
+  stage: push
+  image: docker:29
+  services:
+    - docker:29-dind
+  needs:
+    - build_image
+  script:
+    - source build.env
+    - docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    - docker push "$DOCKER_IMAGE:$IMAGE_TAG"
+
+push_chart:
+  stage: push
+  image: alpine/helm:3.14.0
+  needs:
+    - package_chart
+  script:
+    - source chart.env
+    - helm push chart.tgz oci://$CI_REGISTRY_IMAGE
+
+# -----------------------
+# CD: deploy with Terraform
+# -----------------------
+
+deploy_prod:
+  stage: deploy
+  image: hashicorp/terraform:1.7
+  needs:
+    - push_image
+  environment:
+    name: production
+  script:
+    - source build.env
+    - terraform init
+    - terraform apply \
+        -auto-approve \
+        -var="namespace=production" \
+        -var="environment=prod" \
+        -var="image_tag=$IMAGE_TAG" \
+        -var="image_repo=$CI_REGISTRY_IMAGE/myapp" \
+        -var="chart_version=$CHART_VERSION" \
+        -var="chart_repo=oci://$CI_REGISTRY_IMAGE"
