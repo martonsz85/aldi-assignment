@@ -5,6 +5,10 @@ image:
   tag: latest
 
 service:
-  port: 8080
+  port: 8000
 
 environment: dev
+
+ingress:
+  enabled: true
+  host: myapp.local
