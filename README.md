@@ -2,225 +2,56 @@
 
 ## Overview
 
-The goal of this assignment is to evaluate how you approach a typical DevOps engineering task involving:
+This repository contains a small, containerized Python REST-only application (i.e. no UI) that acts as a configuration manager. The application is designed to be deployed on a Kubernetes cluster using a Helm chart. When run by the accompanying CI/CD pipeline, the Helm chart deployment is orchestrated by Terraform.
 
-- Application development / scripting
-- Containerization
-- Kubernetes
-- Helm
-- Terraform
-- CI/CD
-- Code review
+## Changes
 
-The repository contains intentionally incomplete and imperfect components.
-Your task is to complete, improve and document the solution.
+### Terraform
 
-You are not expected to produce a perfect production-ready system. We are more interested in your engineering approach, decision-making and ability to balance quality with the time constraints.
+* Variables *were* defined, but were left unused in many cases
+* Pinned provider versions at the current major version (could have been more granular)
+* Updated resource definitions to reflect changed behavior introduced since v2.x (e.g. `set` blocks)
+* Added support for Helm chart and container image to be stored in a repository (variables: `image_repo` and `chart_repo`)
 
-Time limit: approximately **3 hours**
+### Helm
 
-## Repository Contents
+* Variables *were* defined, but were left unused in many cases (replica count and container port, hard-coded port numbers were sometimes incorrect)
+* Added labels to resources, so that selectors would work
+* Application version is taken from the build number (`APPVERSION` variable)
+* Ingress is made optional
 
-The repository contains:
+## Assumptions
 
-- An incomplete application skeleton
-- Terraform configuration requiring review and improvement
-- An incomplete Helm chart
-- An incomplete CI/CD pipeline
+* Container image and Helm chart will be stored in GitLab repo
+* Vanilla Kubernetes will be used, if not, Terraform provider should be updated
+* Terraform state file location will be fixed (haven't included it in .gitignore)
+## Known Limitations
 
-Your task is to complete and improve these components. Our goal is to understand your engineering approach, and we will build the upcoming technical interview on this project.
+* The application's data store is ephemeral
+* Current setup uses a single local state file, so it effectively supports only one environment
+* Helm chart version and application version are kept in sync (both use `$CI_PIPELINE_ID`)
 
-## Goal 1
+## Production Improvements
 
-Complete and improve the provided project.
+### Application and Containerization
 
-The repository contains the following files:
+* INFRA: Python package and base image versions could be frozen
+* INFRA: If staying with Python, pip `requirements.txt` could be used
+* SECURITY: Hardening the container image
+	* Don't use Python, but rather a compiled code (e.g. Go, Java, .NET)
+	* Run as a non-root user
+* FEATURE: Use persistent store for configuration data
+### Helm chart / Kubernetes manifest
 
-- Incomplete application code
-- Broken/incomplete terraform configuration
-- Incomplete Helm Chart
-- Incomplete Gitlab CI pipeline
+* INFRA: Liveness / readiness check
+* INFRA: Ingress needs to be enabled and configured once it is finalized
+* INFRA: imagePullSecrets need to be set in the deployment template
 
-### Requirements
+### Terraform
 
-#### Application
+* SECURITY: Store Terraform state in a central location (e.g. Azure Storage, S3 bucket, Kubernetes Secret)
+* INFRA: Update main.tf to create a `regcred` imagePullSecret before helm_release (explicit dependency)
 
-Implement a simple application in either:
+### GitLab CI
 
-- Go
-- Python
-
-The application must expose the following endpoints:
-
-##### `GET /health`
-
-**Response:**
-
-```json
-{
-    "status": "ok"
-}
-```
-
-##### `GET /version`
-
-**Response:**
-
-```json
-{
-    "version": "1.0.0"
-}
-```
-
-##### `GET /env`
-
-**Response:**
-
-```json
-{
-    "environment": "<value from ENVIRONMENT variable>"
-}
-```
-
-##### `POST /config`
-
-**Request:**
-
-```json
-{
-    "name": "database_url",
-    "value": "postgres://example"
-}
-```
-
-**Response:**
-
-```json
-{
-    "name": "database_url",
-    "value": "postgres://example"
-}
-```
-
-##### `GET /config/{name}`
-
-**Example:**
-
-```bash
-GET /config/database_url
-```
-
-**Response:**
-
-```json
-{
-    "name": "database_url",
-    "value": "postgres://example"
-}
-```
-
-##### `DELETE /config/{name}`
-
-**Response:**
-
-```json
-{
-    "deleted": true
-}
-```
-
-#### Containerization
-
-- Create the necessary Dockerfile with minimal setup
-- The image should:
-  - build successfully
-  - run locally
-  - expose the application endpoint
-
-#### Terraform
-
-- Review and fix/complete the Terraform code
-- The Terraform code contains several issues and areas for improvement
-- In case you don't get time to implement changes describe what would you still improve and why
-- Document any changes you make
-
-#### Helm
-
-- Review and fix/complete the Helm Chart
-- The chart should deploy the application to Kubernetes
-- Document any change you make
-
-#### Gitlab CI
-
-- Complete the pipeline so it becomes capable of building and deploying the application
-- The pipeline should support the workflow required to build and deploy the application
-- The pipeline should be logically complete and demonstrate how you would automate the process
-- Add any other necessary jobs to the pipeline
-
-#### Documentation
-
-Update the project README with following information.
-
-##### What You Changed
-
-Describe the changes and the rationale behind it.
-
-##### Assumptions
-
-Describe the assumptions made while completing the assignment.
-
-##### Known Limitations
-
-Describe anything you intentionally omitted.
-
-##### Production Improvements
-
-Describe how you would evolve this solution for production use.
-
-### Deliverables
-
-- Source Code of the Go/Python application
-- Dockerfile
-- Terraform changes
-- Helm changes
-- CI pipeline changes
-- README describing decisions, assumptions and user guide for the project.
-
-### Notes
-
-You are not expected to deploy to a cloud provider.
-The solution should work with a local Kubernetes cluster such as:
-
-- Kind
-- Minikube
-- K3d
-
-### Timing
-
-Timebox yourself to approximately **3 hours**. If you can't finish the work within the timebox, describe in the README.md what is left and how you would approach it.
-
-## Goal 2
-
-You get this half-baked project from one of your colleagues who is a Junior and asking for your guidance.
-
-Provide a short code review in `REVIEW.md` where you address the **top 5 most important things** to fix so the colleague can move forward.
-
-### Review Timing
-
-Spend no more than **30 minutes** on review and feedback.
-
-### Evaluation Criteria
-
-We will evaluate:
-
-- Code quality
-- Terraform quality
-- Kubernetes and Helm knowledge
-- CI/CD design and implementation
-- Documentation quality
-- Code review quality
-- Maintainability and operational thinking
-
-### Use of AI
-
-The use of AI-assisted tools is permitted. However, we encourage you to complete the assignment primarily based on your own knowledge, experience and reasoning. During the interview, we will discuss your implementation choices, trade-offs and decision-making process, so it is important that you fully understand and can explain every part of your solution.
+* FEATURE: Add unit tests, and have the pipeline break if the tests fail
